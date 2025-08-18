@@ -26,7 +26,6 @@
     <div id="organizerLogin" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"><div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md fade-in"><div class="flex justify-between items-center mb-4"><h2 class="text-xl font-bold">Вход для организатора</h2><button onclick="hideOrganizerLogin()" class="text-gray-500 hover:text-gray-700"><i class="fas fa-times"></i></button></div><div class="space-y-4"><div><label class="block text-gray-700 mb-2">Номер организатора</label><input type="text" id="organizerId" class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500"></div><button onclick="loginAsOrganizer()" class="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded-lg transition duration-200">Войти</button></div></div></div>
     <div id="participantLogin" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"><div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md fade-in"><div class="flex justify-between items-center mb-4"><h2 class="text-xl font-bold">Вход для участника</h2><button onclick="hideParticipantLogin()" class="text-gray-500 hover:text-gray-700"><i class="fas fa-times"></i></button></div><div class="space-y-4"><div><label class="block text-gray-700 mb-2">Номер организатора</label><input type="text" id="organizerIdForParticipant" class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div><div><label class="block text-gray-700 mb-2">Ваш номер</label><input type="text" id="participantId" class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div><div><label class="block text-gray-700 mb-2">Ваша роль</label><select id="participantRole" class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"><option value="mafia">Мафия</option><option value="doctor">Доктор</option><option value="commissar">Комиссар</option><option value="civilian">Мирный житель</option></select></div><button onclick="loginAsParticipant()" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg transition duration-200">Войти</button></div></div></div>
     <div id="gameInterface" class="hidden min-h-screen"><header class="bg-gray-800 text-white p-4 shadow-md"><div class="container mx-auto flex justify-between items-center"><div><h1 class="text-xl font-bold">Mafia Game</h1><p id="userInfo" class="text-sm"></p></div></div></header><div class="container mx-auto p-4 flex flex-col lg:flex-row gap-4"><div class="w-full lg:w-64 bg-white rounded-lg shadow-md p-4"><div class="space-y-2"><button id="generalChatBtn" onclick="switchTab('general')" class="w-full text-left px-4 py-2 rounded-lg bg-blue-100 text-blue-800 font-medium"><i class="fas fa-comments mr-2"></i> Общий чат</button><button id="roleChatBtn" onclick="switchTab('role')" class="w-full text-left px-4 py-2 rounded-lg hover:bg-gray-100"><i class="fas fa-user-secret mr-2"></i> Чат роли</button><button id="organizerChatBtn" onclick="switchTab('organizer')" class="w-full text-left px-4 py-2 rounded-lg hover:bg-gray-100"><i class="fas fa-user-shield mr-2"></i> Чат организаторов</button></div>
-    <!-- ЭТОТ БЛОК ТЕПЕРЬ БУДЕТ СКРЫВАТЬСЯ -->
     <div id="participantsBlock" class="mt-6"><h3 class="font-bold text-gray-700 mb-2">Участники</h3><div id="participantsList" class="space-y-2"></div></div></div><div class="flex-1 bg-white rounded-lg shadow-md overflow-hidden"><div class="bg-gray-100 p-4 border-b"><h2 id="chatTitle" class="text-lg font-bold">Общий чат</h2></div><div id="chatMessages" class="p-4 h-96 overflow-y-auto"></div><div class="p-4 border-t"><div id="messageInputArea" class="flex gap-2"><input id="messageInput" type="text" placeholder="Напишите сообщение..." class="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"><button onclick="sendMessage()" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg"><i class="fas fa-paper-plane"></i></button></div></div></div></div></div>
 
     <script>
@@ -42,7 +41,7 @@
         const chatMessages = document.getElementById('chatMessages');
         const messageInput = document.getElementById('messageInput');
         const chatTitle = document.getElementById('chatTitle');
-        const participantsBlock = document.getElementById('participantsBlock'); // Получаем доступ к блоку
+        const participantsBlock = document.getElementById('participantsBlock');
 
         function loginAsOrganizer() {
             const organizerId = document.getElementById('organizerId').value.trim();
@@ -67,22 +66,36 @@
             socket.emit('sendMessage', { organizerId: gameState.currentRoom.id, text: text, tab: gameState.currentTab });
             messageInput.value = '';
         }
-
+        
+        // --- ИСПРАВЛЕННЫЙ ОБРАБОТЧИК ВХОДА ---
         socket.on('loginSuccess', (roomData) => {
+            // 1. Сохраняем данные о комнате, которые прислал сервер
             const organizerIdInput = document.getElementById('organizerId').value.trim() || document.getElementById('organizerIdForParticipant').value.trim();
-            const participantId = document.getElementById('participantId').value.trim();
-            const currentUserId = participantId || organizerIdInput;
-            
             gameState.currentRoom = { ...roomData, id: organizerIdInput };
-            // Находим себя в списке, который прислал сервер (для орга он полный, для игрока - пустой)
-            gameState.currentUser = rooms[organizerIdInput].participants.find(p => p.id === currentUserId);
 
+            // 2. ВОССТАНАВЛИВАЕМ информацию о себе из данных, которые мы только что ввели
+            const participantId = document.getElementById('participantId').value.trim();
+            const isOrganizer = !participantId;
+
+            let currentUserObject;
+            if (isOrganizer) {
+                // Если мы организатор
+                currentUserObject = { id: organizerIdInput, role: 'organizer', name: `Организатор ${organizerIdInput}`, alive: true };
+            } else {
+                // Если мы обычный участник
+                const role = document.getElementById('participantRole').value;
+                const roleNames = { mafia: 'Мафия', doctor: 'Доктор', commissar: 'Комиссар', civilian: 'Мирный житель' };
+                currentUserObject = { id: participantId, role: role, name: `${roleNames[role]} ${participantId}`, alive: true };
+            }
+            // 3. Сохраняем себя в gameState
+            gameState.currentUser = currentUserObject;
+
+            // 4. Теперь все работает
             updateUIAfterLogin();
             hideOrganizerLogin();
             hideParticipantLogin();
         });
 
-        // Это событие теперь будут получать только организаторы
         socket.on('updateParticipants', (participants) => {
             if (gameState.currentRoom) {
                 gameState.currentRoom.participants = participants;
@@ -99,7 +112,6 @@
             }
         });
         
-        // Эта функция теперь будет рисовать что-то только у организатора
         function renderParticipantsList() {
             participantsList.innerHTML = '';
             if (!gameState.currentRoom || !gameState.currentRoom.participants) return;
@@ -137,17 +149,15 @@
             renderChatMessages();
         }
 
-        // --- ГЛАВНОЕ ИЗМЕНЕНИЕ В ИНТЕРФЕЙСЕ ---
         function updateUIAfterLogin() {
             initialScreen.classList.add('hidden');
             gameInterface.classList.remove('hidden');
             userInfo.textContent = `${gameState.currentUser.name} (ID: ${gameState.currentUser.id})`;
             
-            // Если текущий пользователь НЕ организатор...
             if (gameState.currentUser.role !== 'organizer') {
-                participantsBlock.classList.add('hidden'); // ...скрываем весь блок с участниками.
+                participantsBlock.classList.add('hidden');
             } else {
-                participantsBlock.classList.remove('hidden'); // А организатору показываем.
+                participantsBlock.classList.remove('hidden');
             }
             
             switchTab('general');
