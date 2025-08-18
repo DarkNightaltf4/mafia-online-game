@@ -18,84 +18,55 @@ app.get('/', (req, res) => {
 
 const rooms = {}; // Хранилище всех игровых комнат
 
-// --- НОВАЯ, ИСПРАВЛЕННАЯ СУПЕР-ФУНКЦИЯ ---
-function buildParticipantViewFor(viewer, allParticipants) {
-  // Правило №1: Организатор видит абсолютно всё.
-  if (viewer.role === 'organizer') {
-    return allParticipants.map(p => {
-      let color = 'black'; // Цвет по умолчанию
-      if (p.role === 'mafia') color = 'red';
-      if (p.role === 'doctor') color = 'green';
-      if (p.role === 'commissar') color = 'brown';
-      // Возвращаем полную, нетронутую информацию + цвет
-      return { ...p, color };
-    });
-  }
-
-  // Правило №2 и №3: Собираем список для обычного игрока.
-  return allParticipants.map(p => {
-    // Условие A: Это я сам?
-    if (p.id === viewer.id) {
-      // Игрок всегда видит свою собственную роль и имя.
-      return { ...p, color: viewer.role === 'mafia' ? 'red' : 'black' };
-    }
-
-    // Условие B: Я мафия, и этот игрок тоже мафия?
-    if (viewer.role === 'mafia' && p.role === 'mafia') {
-      // Мафия видит своих тиммейтов.
-      return { ...p, color: 'red' };
-    }
-
-    // Условие C (Для всех остальных случаев): Это другой игрок, чью роль я не должен знать.
-    return {
-      id: p.id,
-      name: `Участник ${p.id}`, // <-- КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ: МЕНЯЕМ ИМЯ НА ОБЕЗЛИЧЕННОЕ
-      alive: p.alive,
-      role: p.role === 'organizer' ? 'organizer' : 'Участник', // Меняем роль на обезличенную
-      color: 'black'
-    };
-  });
-}
-
-// Вспомогательная функция для обновления списков у всех игроков
-async function updateAllParticipantLists(organizerId) {
+// УПРОЩЕННАЯ функция, которая отправляет полный список участников ТОЛЬКО организаторам
+async function updateOrganizerParticipantList(organizerId) {
     const room = rooms[organizerId];
     if (!room) return;
-
-    const socketsInRoom = await io.in(organizerId).fetchSockets();
-    for (const connectedSocket of socketsInRoom) {
-        const viewer = connectedSocket.data.user;
-        if (viewer) {
-            const personalizedList = buildParticipantViewFor(viewer, room.participants);
-            connectedSocket.emit('updateParticipants', personalizedList);
-        }
-    }
+    // Отправляем событие ТОЛЬКО в подкомнату для организаторов
+    io.to(organizerId + '-organizers').emit('updateParticipants', room.participants);
 }
+
 
 io.on('connection', (socket) => {
   console.log('Подключился новый игрок:', socket.id);
 
+  // Обработчик входа в игру
   socket.on('login', async (data) => {
     const { organizerId, user } = data;
+
     if (!rooms[organizerId]) {
       rooms[organizerId] = { participants: [], messages: { general: [], role: [], organizer: [] } };
     }
     const room = rooms[organizerId];
     socket.data.user = user;
-    socket.data.organizerId = organizerId;
+
     if (!room.participants.some(p => p.id === user.id)) {
       room.participants.push(user);
     }
-    await socket.join(organizerId);
+    
+    await socket.join(organizerId); // Все входят в основную комнату
+    // Если это организатор, он ДОПОЛНИТЕЛЬНО входит в секретную подкомнату
+    if (user.role === 'organizer') {
+        await socket.join(organizerId + '-organizers');
+    }
     console.log(`Игрок ${user.name} вошел в комнату ${organizerId}`);
 
-    const personalizedInitialList = buildParticipantViewFor(user, room.participants);
-    const personalizedRoomState = { ...room, participants: personalizedInitialList };
-    socket.emit('loginSuccess', personalizedRoomState);
+    // Отправляем новому игроку подтверждение входа
+    if (user.role === 'organizer') {
+        // Организатор получает полную инфу о комнате
+        socket.emit('loginSuccess', room);
+    } else {
+        // Обычный игрок получает состояние комнаты, но с ПУСТЫМ списком участников
+        const publicRoomState = { ...room, participants: [] };
+        socket.emit('loginSuccess', publicRoomState);
+    }
 
-    await updateAllParticipantLists(organizerId);
+    // После каждого входа обновляем список у организаторов
+    await updateOrganizerParticipantList(organizerId);
   });
 
+
+  // Обработчик сообщений (логика анонимизации для общего чата осталась)
   socket.on('sendMessage', async (data) => {
     const { organizerId, text, tab } = data;
     const room = rooms[organizerId];
@@ -118,7 +89,8 @@ io.on('connection', (socket) => {
         if (tab === 'general' && recipient.role !== 'organizer') {
             messageToSend.sender = `Участник ${sender.id}`;
         }
-
+        
+        // Простое окрашивание мафии для своих и для орга
         if (sender.role === 'mafia' && (recipient.role === 'mafia' || recipient.role === 'organizer')) {
             messageToSend.color = 'red';
         }
@@ -127,10 +99,12 @@ io.on('connection', (socket) => {
     }
   });
 
+
   socket.on('disconnect', () => {
     console.log('Игрок отключился:', socket.id);
   });
 });
+
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
