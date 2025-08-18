@@ -15,107 +15,20 @@
         .fade-in { animation: fadeIn 0.3s forwards; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         .chat-message { max-width: 70%; }
+        /* НОВЫЕ СТИЛИ ДЛЯ ЦВЕТОВ */
+        .text-role-red { color: #dc2626; } /* red-600 */
+        .text-role-green { color: #16a34a; } /* green-600 */
+        .text-role-brown { color: #92400e; } /* amber-800 */
     </style>
 </head>
 <body class="bg-gray-100 font-sans">
-    <!-- Initial Screen -->
+    <!-- Вся верхняя HTML-часть остается без изменений -->
     <div id="initialScreen" class="min-h-screen flex flex-col items-center justify-center p-4">
-        <div class="bg-white rounded-lg shadow-xl p-8 w-full max-w-md">
-            <h1 class="text-3xl font-bold text-center mb-8">Mafia Game</h1>
-            <div class="space-y-4">
-                <button onclick="showOrganizerLogin()" class="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 px-4 rounded-lg transition duration-200 flex items-center justify-center">
-                    <i class="fas fa-user-shield mr-2"></i> Организатор
-                </button>
-                <button onclick="showParticipantLogin()" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-4 rounded-lg transition duration-200 flex items-center justify-center">
-                    <i class="fas fa-users mr-2"></i> Участник
-                </button>
-            </div>
-        </div>
+        <div class="bg-white rounded-lg shadow-xl p-8 w-full max-w-md"><h1 class="text-3xl font-bold text-center mb-8">Mafia Game</h1><div class="space-y-4"><button onclick="showOrganizerLogin()" class="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 px-4 rounded-lg transition duration-200 flex items-center justify-center"><i class="fas fa-user-shield mr-2"></i> Организатор</button><button onclick="showParticipantLogin()" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-4 rounded-lg transition duration-200 flex items-center justify-center"><i class="fas fa-users mr-2"></i> Участник</button></div></div>
     </div>
-
-    <!-- Organizer Login -->
-    <div id="organizerLogin" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md fade-in">
-            <div class="flex justify-between items-center mb-4">
-                <h2 class="text-xl font-bold">Вход для организатора</h2>
-                <button onclick="hideOrganizerLogin()" class="text-gray-500 hover:text-gray-700"><i class="fas fa-times"></i></button>
-            </div>
-            <div class="space-y-4">
-                <div>
-                    <label class="block text-gray-700 mb-2">Номер организатора</label>
-                    <input type="text" id="organizerId" class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500">
-                </div>
-                <button onclick="loginAsOrganizer()" class="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded-lg transition duration-200">Войти</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Participant Login -->
-    <div id="participantLogin" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md fade-in">
-            <div class="flex justify-between items-center mb-4">
-                <h2 class="text-xl font-bold">Вход для участника</h2>
-                <button onclick="hideParticipantLogin()" class="text-gray-500 hover:text-gray-700"><i class="fas fa-times"></i></button>
-            </div>
-            <div class="space-y-4">
-                <div>
-                    <label class="block text-gray-700 mb-2">Номер организатора</label>
-                    <input type="text" id="organizerIdForParticipant" class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                </div>
-                <div>
-                    <label class="block text-gray-700 mb-2">Ваш номер</label>
-                    <input type="text" id="participantId" class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                </div>
-                <div>
-                    <label class="block text-gray-700 mb-2">Ваша роль</label>
-                    <select id="participantRole" class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <option value="mafia">Мафия</option>
-                        <option value="doctor">Доктор</option>
-                        <option value="commissar">Комиссар</option>
-                        <option value="civilian">Мирный житель</option>
-                    </select>
-                </div>
-                <button onclick="loginAsParticipant()" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg transition duration-200">Войти</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Game Interface -->
-    <div id="gameInterface" class="hidden min-h-screen">
-        <header class="bg-gray-800 text-white p-4 shadow-md">
-            <div class="container mx-auto flex justify-between items-center">
-                <div>
-                    <h1 class="text-xl font-bold">Mafia Game</h1>
-                    <p id="userInfo" class="text-sm"></p>
-                </div>
-            </div>
-        </header>
-        <div class="container mx-auto p-4 flex flex-col lg:flex-row gap-4">
-            <div class="w-full lg:w-64 bg-white rounded-lg shadow-md p-4">
-                <div class="space-y-2">
-                    <button id="generalChatBtn" onclick="switchTab('general')" class="w-full text-left px-4 py-2 rounded-lg bg-blue-100 text-blue-800 font-medium"><i class="fas fa-comments mr-2"></i> Общий чат</button>
-                    <button id="roleChatBtn" onclick="switchTab('role')" class="w-full text-left px-4 py-2 rounded-lg hover:bg-gray-100"><i class="fas fa-user-secret mr-2"></i> Чат роли</button>
-                    <button id="organizerChatBtn" onclick="switchTab('organizer')" class="w-full text-left px-4 py-2 rounded-lg hover:bg-gray-100"><i class="fas fa-user-shield mr-2"></i> Чат организаторов</button>
-                </div>
-                <div class="mt-6">
-                    <h3 class="font-bold text-gray-700 mb-2">Участники</h3>
-                    <div id="participantsList" class="space-y-2"></div>
-                </div>
-            </div>
-            <div class="flex-1 bg-white rounded-lg shadow-md overflow-hidden">
-                <div class="bg-gray-100 p-4 border-b">
-                    <h2 id="chatTitle" class="text-lg font-bold">Общий чат</h2>
-                </div>
-                <div id="chatMessages" class="p-4 h-96 overflow-y-auto"></div>
-                <div class="p-4 border-t">
-                    <div id="messageInputArea" class="flex gap-2">
-                        <input id="messageInput" type="text" placeholder="Напишите сообщение..." class="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <button onclick="sendMessage()" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg"><i class="fas fa-paper-plane"></i></button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+    <div id="organizerLogin" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"><div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md fade-in"><div class="flex justify-between items-center mb-4"><h2 class="text-xl font-bold">Вход для организатора</h2><button onclick="hideOrganizerLogin()" class="text-gray-500 hover:text-gray-700"><i class="fas fa-times"></i></button></div><div class="space-y-4"><div><label class="block text-gray-700 mb-2">Номер организатора</label><input type="text" id="organizerId" class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500"></div><button onclick="loginAsOrganizer()" class="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded-lg transition duration-200">Войти</button></div></div></div>
+    <div id="participantLogin" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"><div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md fade-in"><div class="flex justify-between items-center mb-4"><h2 class="text-xl font-bold">Вход для участника</h2><button onclick="hideParticipantLogin()" class="text-gray-500 hover:text-gray-700"><i class="fas fa-times"></i></button></div><div class="space-y-4"><div><label class="block text-gray-700 mb-2">Номер организатора</label><input type="text" id="organizerIdForParticipant" class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div><div><label class="block text-gray-700 mb-2">Ваш номер</label><input type="text" id="participantId" class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div><div><label class="block text-gray-700 mb-2">Ваша роль</label><select id="participantRole" class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"><option value="mafia">Мафия</option><option value="doctor">Доктор</option><option value="commissar">Комиссар</option><option value="civilian">Мирный житель</option></select></div><button onclick="loginAsParticipant()" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg transition duration-200">Войти</button></div></div></div>
+    <div id="gameInterface" class="hidden min-h-screen"><header class="bg-gray-800 text-white p-4 shadow-md"><div class="container mx-auto flex justify-between items-center"><div><h1 class="text-xl font-bold">Mafia Game</h1><p id="userInfo" class="text-sm"></p></div></div></header><div class="container mx-auto p-4 flex flex-col lg:flex-row gap-4"><div class="w-full lg:w-64 bg-white rounded-lg shadow-md p-4"><div class="space-y-2"><button id="generalChatBtn" onclick="switchTab('general')" class="w-full text-left px-4 py-2 rounded-lg bg-blue-100 text-blue-800 font-medium"><i class="fas fa-comments mr-2"></i> Общий чат</button><button id="roleChatBtn" onclick="switchTab('role')" class="w-full text-left px-4 py-2 rounded-lg hover:bg-gray-100"><i class="fas fa-user-secret mr-2"></i> Чат роли</button><button id="organizerChatBtn" onclick="switchTab('organizer')" class="w-full text-left px-4 py-2 rounded-lg hover:bg-gray-100"><i class="fas fa-user-shield mr-2"></i> Чат организаторов</button></div><div class="mt-6"><h3 class="font-bold text-gray-700 mb-2">Участники</h3><div id="participantsList" class="space-y-2"></div></div></div><div class="flex-1 bg-white rounded-lg shadow-md overflow-hidden"><div class="bg-gray-100 p-4 border-b"><h2 id="chatTitle" class="text-lg font-bold">Общий чат</h2></div><div id="chatMessages" class="p-4 h-96 overflow-y-auto"></div><div class="p-4 border-t"><div id="messageInputArea" class="flex gap-2"><input id="messageInput" type="text" placeholder="Напишите сообщение..." class="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"><button onclick="sendMessage()" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg"><i class="fas fa-paper-plane"></i></button></div></div></div></div></div>
 
     <script>
         const socket = io();
@@ -148,18 +61,10 @@
             socket.emit('login', { organizerId, user });
         }
         
-        // --- ИЗМЕНЕННАЯ ФУНКЦИЯ ОТПРАВКИ СООБЩЕНИЯ ---
         function sendMessage() {
             const text = messageInput.value.trim();
             if (!text || !gameState.currentRoom) return;
-            
-            // Теперь мы отправляем только сырой текст. Сервер сам разберется с именем.
-            socket.emit('sendMessage', {
-                organizerId: gameState.currentRoom.id,
-                text: text, // Отправляем только текст
-                tab: gameState.currentTab
-            });
-
+            socket.emit('sendMessage', { organizerId: gameState.currentRoom.id, text: text, tab: gameState.currentTab });
             messageInput.value = '';
         }
 
@@ -188,35 +93,43 @@
             if (gameState.currentRoom) {
                 if (!gameState.currentRoom.messages[tab]) gameState.currentRoom.messages[tab] = [];
                 gameState.currentRoom.messages[tab].push(message);
-                
-                if (gameState.currentTab === tab) {
-                    renderChatMessages();
-                }
+                if (gameState.currentTab === tab) renderChatMessages();
             }
         });
         
+        // --- ОБНОВЛЕННАЯ ФУНКЦИЯ ОТРИСОВКИ УЧАСТНИКОВ (С ЦВЕТАМИ) ---
         function renderParticipantsList() {
             participantsList.innerHTML = '';
             if (!gameState.currentRoom || !gameState.currentRoom.participants) return;
             
+            const colorMap = { red: 'text-role-red', green: 'text-role-green', brown: 'text-role-brown' };
+
             gameState.currentRoom.participants.forEach(p => {
                 const pDiv = document.createElement('div');
-                pDiv.className = 'p-2 border-b';
-                // Отображаем ту роль, которую прислал сервер (может быть "Участник")
+                pDiv.className = 'p-2 border-b font-medium';
+                // Сервер присылает нам цвет, мы просто применяем его как CSS класс
+                const colorClass = colorMap[p.color] || '';
+                if (colorClass) {
+                    pDiv.classList.add(colorClass);
+                }
+                
                 pDiv.textContent = `${p.name} (${p.role})`;
                 if (!p.alive) pDiv.style.textDecoration = 'line-through';
                 participantsList.appendChild(pDiv);
             });
         }
 
+        // --- ОБНОВЛЕННАЯ ФУНКЦИЯ ОТРИСОВКИ СООБЩЕНИЙ (С ЦВЕТАМИ) ---
         function renderChatMessages() {
             chatMessages.innerHTML = '';
             if (!gameState.currentRoom) return;
 
+            const colorMap = { red: 'text-role-red', green: 'text-role-green', brown: 'text-role-brown' };
             const messages = gameState.currentRoom.messages[gameState.currentTab] || [];
+            
             messages.forEach(msg => {
                 const msgDiv = document.createElement('div');
-                msgDiv.className = `p-2 my-1 rounded w-fit chat-message`;
+                msgDiv.className = 'p-2 my-1 rounded w-fit chat-message';
 
                 if (msg.senderId === gameState.currentUser.id) {
                     msgDiv.classList.add('bg-blue-200', 'ml-auto');
@@ -224,7 +137,10 @@
                     msgDiv.classList.add('bg-gray-200', 'mr-auto');
                 }
                 
-                msgDiv.innerHTML = `<div class="font-bold text-sm">${msg.sender}</div><div>${msg.text}</div><div class="text-xs text-gray-500 text-right">${msg.time}</div>`;
+                const colorClass = colorMap[msg.color] || '';
+                const senderHTML = `<div class="font-bold text-sm ${colorClass}">${msg.sender}</div>`;
+                
+                msgDiv.innerHTML = `${senderHTML}<div>${msg.text}</div><div class="text-xs text-gray-500 text-right">${msg.time}</div>`;
                 chatMessages.appendChild(msgDiv);
             });
             chatMessages.scrollTop = chatMessages.scrollHeight;

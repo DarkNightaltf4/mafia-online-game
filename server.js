@@ -18,110 +18,127 @@ app.get('/', (req, res) => {
 
 const rooms = {}; // Хранилище всех игровых комнат
 
-// Вспомогательная функция, которая создает "публичную" версию списка участников
-function getPublicParticipants(participants) {
-  return participants.map(p => ({
+// --- НОВАЯ СУПЕР-ФУНКЦИЯ, КОТОРАЯ ГОТОВИТ ПЕРСОНАЛЬНЫЙ ВИД ДЛЯ КАЖДОГО ИГРОКА ---
+function buildParticipantViewFor(viewer, allParticipants) {
+  // Если смотрящий - организатор, он видит всё и с цветами
+  if (viewer.role === 'organizer') {
+    return allParticipants.map(p => {
+      let color = 'black'; // Цвет по умолчанию
+      if (p.role === 'mafia') color = 'red';
+      if (p.role === 'doctor') color = 'green';
+      if (p.role === 'commissar') color = 'brown';
+      return { ...p, color }; // Возвращаем участника с полной инфой + цветом
+    });
+  }
+
+  // Если смотрящий - мафия, он видит своих тиммейтов
+  if (viewer.role === 'mafia') {
+    return allParticipants.map(p => {
+      // Если участник, на которого мы смотрим, тоже мафия...
+      if (p.role === 'mafia') {
+        return { ...p, color: 'red' }; // ...показываем его роль и красим в красный.
+      }
+      // Всех остальных скрываем
+      return {
+        id: p.id,
+        name: p.name,
+        alive: p.alive,
+        role: p.role === 'organizer' ? 'organizer' : 'Участник', // Скрываем роль
+        color: 'black'
+      };
+    });
+  }
+
+  // Все остальные (доктор, комиссар, мирные) видят публичную версию
+  return allParticipants.map(p => ({
     id: p.id,
     name: p.name,
     alive: p.alive,
-    role: p.role === 'organizer' ? 'organizer' : 'Участник'
+    role: p.role === 'organizer' ? 'organizer' : 'Участник',
+    color: 'black'
   }));
 }
 
-// Запускается каждый раз, когда новый пользователь подключается
+// --- НОВАЯ ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ ДЛЯ ОБНОВЛЕНИЯ ВСЕХ СПИСКОВ ---
+async function updateAllParticipantLists(organizerId) {
+    const room = rooms[organizerId];
+    if (!room) return;
+
+    const socketsInRoom = await io.in(organizerId).fetchSockets();
+    for (const connectedSocket of socketsInRoom) {
+        const viewer = connectedSocket.data.user;
+        if (viewer) {
+            const personalizedList = buildParticipantViewFor(viewer, room.participants);
+            connectedSocket.emit('updateParticipants', personalizedList);
+        }
+    }
+}
+
+
 io.on('connection', (socket) => {
   console.log('Подключился новый игрок:', socket.id);
 
-  // Обработчик входа в игру
   socket.on('login', async (data) => {
     const { organizerId, user } = data;
-
     if (!rooms[organizerId]) {
       rooms[organizerId] = { participants: [], messages: { general: [], role: [], organizer: [] } };
     }
     const room = rooms[organizerId];
-
     socket.data.user = user;
     socket.data.organizerId = organizerId;
-
     if (!room.participants.some(p => p.id === user.id)) {
       room.participants.push(user);
     }
-    
     await socket.join(organizerId);
     console.log(`Игрок ${user.name} вошел в комнату ${organizerId}`);
 
-    if (user.role === 'organizer') {
-        socket.emit('loginSuccess', room);
-    } else {
-        const publicRoomState = { ...room, participants: getPublicParticipants(room.participants) };
-        socket.emit('loginSuccess', publicRoomState);
-    }
+    // Отправляем новому игроку его персональную версию комнаты при входе
+    const personalizedInitialList = buildParticipantViewFor(user, room.participants);
+    const personalizedRoomState = { ...room, participants: personalizedInitialList };
+    socket.emit('loginSuccess', personalizedRoomState);
 
-    const socketsInRoom = await io.in(organizerId).fetchSockets();
-    for (const connectedSocket of socketsInRoom) {
-      if (connectedSocket.data.user?.role === 'organizer') {
-        connectedSocket.emit('updateParticipants', room.participants);
-      } else {
-        connectedSocket.emit('updateParticipants', getPublicParticipants(room.participants));
-      }
-    }
+    // Обновляем списки у ВСЕХ игроков в комнате
+    await updateAllParticipantLists(organizerId);
   });
 
-
-  // --- ПОЛНОСТЬЮ ПЕРЕРАБОТАННЫЙ ОБРАБОТЧИК СООБЩЕНИЙ ---
   socket.on('sendMessage', async (data) => {
     const { organizerId, text, tab } = data;
     const room = rooms[organizerId];
     const sender = socket.data.user;
-
-    if (!room || !sender) return; // Проверка, что все данные на месте
+    if (!room || !sender) return;
 
     const timeString = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-    // 1. Создаем "настоящее" сообщение с реальной ролью в имени
-    const trueMessage = {
-        sender: sender.name, // Например, "Мафия 1"
-        senderId: sender.id,
-        text: text,
-        time: timeString
-    };
-
-    // 2. Создаем "публичное" сообщение с обезличенным именем
-    const publicMessage = {
-        ...trueMessage,
-        sender: `Участник ${sender.id}` // Всегда "Участник + номер"
-    };
-
-    // 3. Сохраняем в историю чата на сервере всегда "настоящее" сообщение
+    const trueMessage = { sender: sender.name, senderId: sender.id, text, time: timeString };
     if (!room.messages[tab]) room.messages[tab] = [];
     room.messages[tab].push(trueMessage);
 
-    // 4. Рассылаем игрокам правильные версии сообщения
     const socketsInRoom = await io.in(organizerId).fetchSockets();
-
     for (const connectedSocket of socketsInRoom) {
         const recipient = connectedSocket.data.user;
+        if (!recipient) continue;
 
-        // Если это общий чат, и получатель - не организатор, отправляем ему публичную версию
+        let messageToSend = { ...trueMessage };
+
+        // Логика анонимизации и цвета для общего чата
         if (tab === 'general' && recipient.role !== 'organizer') {
-            connectedSocket.emit('newMessage', { message: publicMessage, tab });
-        } else {
-            // Во всех остальных случаях (чат роли, чат организатора, или если получатель - сам организатор)
-            // отправляем настоящую версию сообщения
-            connectedSocket.emit('newMessage', { message: trueMessage, tab });
+            messageToSend.sender = `Участник ${sender.id}`;
         }
+
+        // Логика цвета для мафии
+        if (sender.role === 'mafia' && (recipient.role === 'mafia' || recipient.role === 'organizer')) {
+            messageToSend.color = 'red';
+        }
+
+        connectedSocket.emit('newMessage', { message: messageToSend, tab });
     }
   });
 
-
-  // Обработчик отключения
   socket.on('disconnect', () => {
     console.log('Игрок отключился:', socket.id);
   });
 });
 
-// --- 4. Запускаем сервер ---
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   console.log(`Сервер запущен на порту ${PORT}`);
