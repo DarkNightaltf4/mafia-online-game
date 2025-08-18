@@ -18,48 +18,46 @@ app.get('/', (req, res) => {
 
 const rooms = {}; // Хранилище всех игровых комнат
 
-// --- НОВАЯ СУПЕР-ФУНКЦИЯ, КОТОРАЯ ГОТОВИТ ПЕРСОНАЛЬНЫЙ ВИД ДЛЯ КАЖДОГО ИГРОКА ---
+// --- НОВАЯ, ИСПРАВЛЕННАЯ СУПЕР-ФУНКЦИЯ ---
 function buildParticipantViewFor(viewer, allParticipants) {
-  // Если смотрящий - организатор, он видит всё и с цветами
+  // Правило №1: Организатор видит абсолютно всё.
   if (viewer.role === 'organizer') {
     return allParticipants.map(p => {
       let color = 'black'; // Цвет по умолчанию
       if (p.role === 'mafia') color = 'red';
       if (p.role === 'doctor') color = 'green';
       if (p.role === 'commissar') color = 'brown';
-      return { ...p, color }; // Возвращаем участника с полной инфой + цветом
+      // Возвращаем полную, нетронутую информацию + цвет
+      return { ...p, color };
     });
   }
 
-  // Если смотрящий - мафия, он видит своих тиммейтов
-  if (viewer.role === 'mafia') {
-    return allParticipants.map(p => {
-      // Если участник, на которого мы смотрим, тоже мафия...
-      if (p.role === 'mafia') {
-        return { ...p, color: 'red' }; // ...показываем его роль и красим в красный.
-      }
-      // Всех остальных скрываем
-      return {
-        id: p.id,
-        name: p.name,
-        alive: p.alive,
-        role: p.role === 'organizer' ? 'organizer' : 'Участник', // Скрываем роль
-        color: 'black'
-      };
-    });
-  }
+  // Правило №2 и №3: Собираем список для обычного игрока.
+  return allParticipants.map(p => {
+    // Условие A: Это я сам?
+    if (p.id === viewer.id) {
+      // Игрок всегда видит свою собственную роль и имя.
+      return { ...p, color: viewer.role === 'mafia' ? 'red' : 'black' };
+    }
 
-  // Все остальные (доктор, комиссар, мирные) видят публичную версию
-  return allParticipants.map(p => ({
-    id: p.id,
-    name: p.name,
-    alive: p.alive,
-    role: p.role === 'organizer' ? 'organizer' : 'Участник',
-    color: 'black'
-  }));
+    // Условие B: Я мафия, и этот игрок тоже мафия?
+    if (viewer.role === 'mafia' && p.role === 'mafia') {
+      // Мафия видит своих тиммейтов.
+      return { ...p, color: 'red' };
+    }
+
+    // Условие C (Для всех остальных случаев): Это другой игрок, чью роль я не должен знать.
+    return {
+      id: p.id,
+      name: `Участник ${p.id}`, // <-- КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ: МЕНЯЕМ ИМЯ НА ОБЕЗЛИЧЕННОЕ
+      alive: p.alive,
+      role: p.role === 'organizer' ? 'organizer' : 'Участник', // Меняем роль на обезличенную
+      color: 'black'
+    };
+  });
 }
 
-// --- НОВАЯ ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ ДЛЯ ОБНОВЛЕНИЯ ВСЕХ СПИСКОВ ---
+// Вспомогательная функция для обновления списков у всех игроков
 async function updateAllParticipantLists(organizerId) {
     const room = rooms[organizerId];
     if (!room) return;
@@ -73,7 +71,6 @@ async function updateAllParticipantLists(organizerId) {
         }
     }
 }
-
 
 io.on('connection', (socket) => {
   console.log('Подключился новый игрок:', socket.id);
@@ -92,12 +89,10 @@ io.on('connection', (socket) => {
     await socket.join(organizerId);
     console.log(`Игрок ${user.name} вошел в комнату ${organizerId}`);
 
-    // Отправляем новому игроку его персональную версию комнаты при входе
     const personalizedInitialList = buildParticipantViewFor(user, room.participants);
     const personalizedRoomState = { ...room, participants: personalizedInitialList };
     socket.emit('loginSuccess', personalizedRoomState);
 
-    // Обновляем списки у ВСЕХ игроков в комнате
     await updateAllParticipantLists(organizerId);
   });
 
@@ -120,12 +115,10 @@ io.on('connection', (socket) => {
 
         let messageToSend = { ...trueMessage };
 
-        // Логика анонимизации и цвета для общего чата
         if (tab === 'general' && recipient.role !== 'organizer') {
             messageToSend.sender = `Участник ${sender.id}`;
         }
 
-        // Логика цвета для мафии
         if (sender.role === 'mafia' && (recipient.role === 'mafia' || recipient.role === 'organizer')) {
             messageToSend.color = 'red';
         }
