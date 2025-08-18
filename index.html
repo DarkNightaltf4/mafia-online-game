@@ -6,7 +6,6 @@
     <title>Mafia Game</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- ЭТА СТРОКА ДОБАВЛЕНА ДЛЯ СВЯЗИ С СЕРВЕРОМ -->
     <script src="/socket.io/socket.io.js"></script>
     <style>
         .slide-in { animation: slideIn 0.3s forwards; }
@@ -118,21 +117,10 @@
         </div>
     </div>
 
-    <!-- ===================================================================== -->
-    <!-- ВЕСЬ СТАРЫЙ JAVASCRIPT УДАЛЕН И ЗАМЕНЕН НА НОВЫЙ НИЖЕ -->
-    <!-- ===================================================================== -->
     <script>
-        // --- 1. Устанавливаем соединение с сервером ---
         const socket = io();
-        
-        // --- 2. Локальное состояние клиента (кто я, и где я) ---
-        let gameState = {
-            currentUser: null,
-            currentRoom: null, // Здесь будут храниться данные комнаты, полученные от сервера
-            currentTab: 'general'
-        };
+        let gameState = { currentUser: null, currentRoom: null, currentTab: 'general' };
 
-        // --- 3. Получаем доступ к элементам на странице ---
         const initialScreen = document.getElementById('initialScreen');
         const organizerLogin = document.getElementById('organizerLogin');
         const participantLogin = document.getElementById('participantLogin');
@@ -143,18 +131,10 @@
         const messageInput = document.getElementById('messageInput');
         const chatTitle = document.getElementById('chatTitle');
 
-        // --- 4. Функции, которые ОТПРАВЛЯЮТ информацию на сервер ---
-
         function loginAsOrganizer() {
             const organizerId = document.getElementById('organizerId').value.trim();
             if (!organizerId) return alert('Введите номер организатора');
-            const user = {
-                id: organizerId,
-                role: 'organizer',
-                name: `Организатор ${organizerId}`,
-                alive: true
-            };
-            // Отправляем событие 'login' на сервер с нашими данными
+            const user = { id: organizerId, role: 'organizer', name: `Организатор ${organizerId}`, alive: true };
             socket.emit('login', { organizerId, user });
         }
 
@@ -164,55 +144,38 @@
             const role = document.getElementById('participantRole').value;
             if (!organizerId || !participantId) return alert('Заполните все поля');
             const roleNames = { mafia: 'Мафия', doctor: 'Доктор', commissar: 'Комиссар', civilian: 'Мирный житель' };
-            const user = {
-                id: participantId,
-                role: role,
-                name: `${roleNames[role]} ${participantId}`,
-                alive: true
-            };
-            // Отправляем событие 'login' на сервер с нашими данными
+            const user = { id: participantId, role: role, name: `${roleNames[role]} ${participantId}`, alive: true };
             socket.emit('login', { organizerId, user });
         }
-
+        
+        // --- ИЗМЕНЕННАЯ ФУНКЦИЯ ОТПРАВКИ СООБЩЕНИЯ ---
         function sendMessage() {
             const text = messageInput.value.trim();
             if (!text || !gameState.currentRoom) return;
-            const timeString = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            const message = {
-                sender: gameState.currentUser.name,
-                senderId: gameState.currentUser.id,
-                text: text,
-                time: timeString
-            };
-            // Отправляем 'sendMessage' на сервер, чтобы он разослал его всем в комнате
+            
+            // Теперь мы отправляем только сырой текст. Сервер сам разберется с именем.
             socket.emit('sendMessage', {
                 organizerId: gameState.currentRoom.id,
-                message: message,
+                text: text, // Отправляем только текст
                 tab: gameState.currentTab
             });
+
             messageInput.value = '';
         }
 
-        // --- 5. Функции, которые СЛУШАЮТ события от сервера ---
-
-        // Сервер подтвердил наш вход и прислал состояние комнаты
         socket.on('loginSuccess', (roomData) => {
             const organizerIdInput = document.getElementById('organizerId').value.trim() || document.getElementById('organizerIdForParticipant').value.trim();
             const participantId = document.getElementById('participantId').value.trim();
             const currentUserId = participantId || organizerIdInput;
             
-            // Сохраняем, кто мы
             gameState.currentUser = roomData.participants.find(p => p.id === currentUserId);
-            // Сохраняем все данные о комнате
             gameState.currentRoom = { ...roomData, id: organizerIdInput };
 
-            // Обновляем интерфейс
             updateUIAfterLogin();
             hideOrganizerLogin();
             hideParticipantLogin();
         });
 
-        // Сервер сообщил, что список участников обновился (кто-то вошел или вышел)
         socket.on('updateParticipants', (participants) => {
             if (gameState.currentRoom) {
                 gameState.currentRoom.participants = participants;
@@ -220,23 +183,18 @@
             }
         });
 
-        // Сервер прислал новое сообщение
         socket.on('newMessage', (data) => {
             const { message, tab } = data;
             if (gameState.currentRoom) {
-                // Добавляем сообщение в локальный кеш
                 if (!gameState.currentRoom.messages[tab]) gameState.currentRoom.messages[tab] = [];
                 gameState.currentRoom.messages[tab].push(message);
                 
-                // Если мы сейчас смотрим этот чат, то сразу его обновляем
                 if (gameState.currentTab === tab) {
                     renderChatMessages();
                 }
             }
         });
         
-        // --- 6. Функции, которые просто обновляют экран (рисуют) ---
-
         function renderParticipantsList() {
             participantsList.innerHTML = '';
             if (!gameState.currentRoom || !gameState.currentRoom.participants) return;
@@ -244,6 +202,7 @@
             gameState.currentRoom.participants.forEach(p => {
                 const pDiv = document.createElement('div');
                 pDiv.className = 'p-2 border-b';
+                // Отображаем ту роль, которую прислал сервер (может быть "Участник")
                 pDiv.textContent = `${p.name} (${p.role})`;
                 if (!p.alive) pDiv.style.textDecoration = 'line-through';
                 participantsList.appendChild(pDiv);
@@ -259,25 +218,20 @@
                 const msgDiv = document.createElement('div');
                 msgDiv.className = `p-2 my-1 rounded w-fit chat-message`;
 
-                // Выравнивание сообщения
                 if (msg.senderId === gameState.currentUser.id) {
-                    msgDiv.classList.add('bg-blue-200', 'ml-auto'); // Мои сообщения
+                    msgDiv.classList.add('bg-blue-200', 'ml-auto');
                 } else {
-                    msgDiv.classList.add('bg-gray-200', 'mr-auto'); // Чужие сообщения
+                    msgDiv.classList.add('bg-gray-200', 'mr-auto');
                 }
                 
                 msgDiv.innerHTML = `<div class="font-bold text-sm">${msg.sender}</div><div>${msg.text}</div><div class="text-xs text-gray-500 text-right">${msg.time}</div>`;
                 chatMessages.appendChild(msgDiv);
             });
-            // Автоматически прокручиваем чат вниз
             chatMessages.scrollTop = chatMessages.scrollHeight;
         }
 
-        // --- 7. Вспомогательные функции для интерфейса ---
-
         function switchTab(tab) {
             gameState.currentTab = tab;
-            // Здесь вы можете добавить логику для подсветки активной кнопки чата
             chatTitle.textContent = `Чат: ${tab}`;
             renderChatMessages();
         }
@@ -286,7 +240,7 @@
             initialScreen.classList.add('hidden');
             gameInterface.classList.remove('hidden');
             userInfo.textContent = `${gameState.currentUser.name} (ID: ${gameState.currentUser.id})`;
-            switchTab('general'); // По умолчанию открываем общий чат
+            switchTab('general');
         }
 
         function showOrganizerLogin() { organizerLogin.classList.remove('hidden'); }
@@ -294,12 +248,7 @@
         function showParticipantLogin() { participantLogin.classList.remove('hidden'); }
         function hideParticipantLogin() { participantLogin.classList.add('hidden'); }
         
-        // Добавляем отправку сообщения по нажатию Enter
-        messageInput.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                sendMessage();
-            }
-        });
+        messageInput.addEventListener('keypress', function(e) { if (e.key === 'Enter') sendMessage(); });
     </script>
 </body>
 </html>
